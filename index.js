@@ -1,7 +1,5 @@
 var camelCase = require('camelcase')
-var path = require('path')
 var tokenizeArgString = require('./lib/tokenize-arg-string')
-var util = require('util')
 
 function parse (args, opts) {
   if (!opts) opts = {}
@@ -27,10 +25,7 @@ function parse (args, opts) {
   var notFlagsOption = configuration['populate--']
   var notFlagsArgv = notFlagsOption ? '--' : '_'
   var newAliases = {}
-  // allow a i18n handler to be passed in, default to a fake one (util.format).
-  var __ = opts.__ || function (str) {
-    return util.format.apply(util, Array.prototype.slice.call(arguments))
-  }
+
   var error = null
   var flags = {
     aliases: {},
@@ -284,7 +279,6 @@ function parse (args, opts) {
   // 5. configured default value
   applyEnvVars(argv, true) // special case: check env vars that point to config file
   applyEnvVars(argv, false)
-  setConfig(argv)
   setConfigObjects()
   applyDefaultsAndAliases(argv, flags.aliases, defaults)
   applyCoercions(argv)
@@ -305,7 +299,7 @@ function parse (args, opts) {
   function eatNargs (i, key, args) {
     var toEat = checkAllAliases(key, flags.nargs)
 
-    if (args.length - (i + 1) < toEat) error = Error(__('Not enough arguments following: %s', key))
+    if (args.length - (i + 1) < toEat) error = Error('Not enough arguments following: %s', key)
 
     for (var ii = i + 1; ii < (toEat + i + 1); ii++) {
       setArg(key, args[ii])
@@ -380,20 +374,6 @@ function parse (args, opts) {
         setKey(argv, x, value)
       })
     }
-
-    // Set normalize getter and setter when key is in 'normalize' but isn't an array
-    if (checkAllAliases(key, flags.normalize) && !checkAllAliases(key, flags.arrays)) {
-      var keys = [key].concat(flags.aliases[key] || [])
-      keys.forEach(function (key) {
-        argv.__defineSetter__(key, function (v) {
-          val = path.normalize(v)
-        })
-
-        argv.__defineGetter__(key, function () {
-          return typeof val === 'string' ? path.normalize(val) : val
-        })
-      })
-    }
   }
 
   function processValue (key, val) {
@@ -413,50 +393,7 @@ function parse (args, opts) {
       value = increment
     }
 
-    // Set normalized value when key is in 'normalize' and in 'arrays'
-    if (checkAllAliases(key, flags.normalize) && checkAllAliases(key, flags.arrays)) {
-      if (Array.isArray(val)) value = val.map(path.normalize)
-      else value = path.normalize(val)
-    }
     return value
-  }
-
-  // set args from config.json file, this should be
-  // applied last so that defaults can be applied.
-  function setConfig (argv) {
-    var configLookup = {}
-
-    // expand defaults/aliases, in-case any happen to reference
-    // the config.json file.
-    applyDefaultsAndAliases(configLookup, flags.aliases, defaults)
-
-    Object.keys(flags.configs).forEach(function (configKey) {
-      var configPath = argv[configKey] || configLookup[configKey]
-      if (configPath) {
-        try {
-          var config = null
-          var resolvedConfigPath = path.resolve(process.cwd(), configPath)
-
-          if (typeof flags.configs[configKey] === 'function') {
-            try {
-              config = flags.configs[configKey](resolvedConfigPath)
-            } catch (e) {
-              config = e
-            }
-            if (config instanceof Error) {
-              error = config
-              return
-            }
-          } else {
-            config = require(resolvedConfigPath)
-          }
-
-          setConfigObject(config)
-        } catch (ex) {
-          if (argv[configKey]) error = Error(__('Invalid JSON config file: %s', configPath))
-        }
-      }
-    })
   }
 
   // set args from config object.
@@ -763,4 +700,4 @@ Parser.detailed = function (args, opts) {
   return parse(args.slice(), opts)
 }
 
-module.exports = Parser
+export default Parser;
